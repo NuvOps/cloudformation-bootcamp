@@ -1,28 +1,27 @@
----
-AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: 2010-09-09
 Description: ''
 Parameters:
   VpcId:
-    Type: AWS::EC2::VPC::Id
+    Type: 'AWS::EC2::VPC::Id'
     Description: VpcId of your existing Virtual Private Cloud (VPC)
     ConstraintDescription: must be the VPC Id of an existing Virtual Private Cloud.
   Subnets:
-    Type: List<AWS::EC2::Subnet::Id>
+    Type: 'List<AWS::EC2::Subnet::Id>'
     Description: The list of SubnetIds in your Virtual Private Cloud (VPC)
-    ConstraintDescription: must be a list of at least two existing subnets associated
-      with at least two different availability zones.
+    ConstraintDescription: >-
+      must be a list of at least two existing subnets associated with at least
+      two different availability zones.
   KeyName:
     Description: The EC2 Key Pair to allow SSH access to the instances
-    Type: AWS::EC2::KeyPair::KeyName
+    Type: 'AWS::EC2::KeyPair::KeyName'
     ConstraintDescription: must be the name of an existing EC2 KeyPair.
   AMIid:
-     Description: Amazon Linux 2 AMI id for your region
-     Type: String
-     ConstraintDescription: must be the an Amazon Linux 2 Image
-
+    Description: Amazon Linux 2 AMI id for your region
+    Type: String
+    ConstraintDescription: must be the an Amazon Linux 2 Image
 Resources:
   WebServerGroup:
-    Type: AWS::AutoScaling::AutoScalingGroup
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
     Properties:
       VPCZoneIdentifier:
         Ref: Subnets
@@ -31,10 +30,9 @@ Resources:
       MinSize: '2'
       MaxSize: '3'
       TargetGroupARNs:
-      - Ref: ALBTargetGroup
-
+        - Ref: ALBTargetGroup
   LaunchConfig:
-    Type: AWS::AutoScaling::LaunchConfiguration
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
       Comment: Install a simple application
     Properties:
@@ -43,18 +41,16 @@ Resources:
       ImageId:
         Ref: AMIid
       SecurityGroups:
-      - Ref: InstanceSecurityGroup
+        - Ref: InstanceSecurityGroup
       InstanceType: t3.micro
       UserData:
-       Fn::Base64: 
-        !Sub |
+        'Fn::Base64': !Sub |
           #!/bin/bash
           yum update -y
           yum install -y httpd
           systemctl start httpd
-
   WebServerScaleUpPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
+    Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
       AdjustmentType: ChangeInCapacity
       AutoScalingGroupName:
@@ -62,15 +58,15 @@ Resources:
       Cooldown: '60'
       ScalingAdjustment: '1'
   WebServerScaleDownPolicy:
-    Type: AWS::AutoScaling::ScalingPolicy
+    Type: 'AWS::AutoScaling::ScalingPolicy'
     Properties:
       AdjustmentType: ChangeInCapacity
       AutoScalingGroupName:
         Ref: WebServerGroup
       Cooldown: '60'
-      ScalingAdjustment: "-1"
+      ScalingAdjustment: '-1'
   CPUAlarmHigh:
-    Type: AWS::CloudWatch::Alarm
+    Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmDescription: Scale-up if CPU > 90% for 10 minutes
       MetricName: CPUUtilization
@@ -80,14 +76,14 @@ Resources:
       EvaluationPeriods: '2'
       Threshold: '80'
       AlarmActions:
-      - Ref: WebServerScaleUpPolicy
+        - Ref: WebServerScaleUpPolicy
       Dimensions:
-      - Name: AutoScalingGroupName
-        Value:
-          Ref: WebServerGroup
+        - Name: AutoScalingGroupName
+          Value:
+            Ref: WebServerGroup
       ComparisonOperator: GreaterThanThreshold
   CPUAlarmLow:
-    Type: AWS::CloudWatch::Alarm
+    Type: 'AWS::CloudWatch::Alarm'
     Properties:
       AlarmDescription: Scale-down if CPU < 70% for 10 minutes
       MetricName: CPUUtilization
@@ -97,32 +93,32 @@ Resources:
       EvaluationPeriods: '2'
       Threshold: '20'
       AlarmActions:
-      - Ref: WebServerScaleDownPolicy
+        - Ref: WebServerScaleDownPolicy
       Dimensions:
-      - Name: AutoScalingGroupName
-        Value:
-          Ref: WebServerGroup
+        - Name: AutoScalingGroupName
+          Value:
+            Ref: WebServerGroup
       ComparisonOperator: LessThanThreshold
   ApplicationLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
     Properties:
       Subnets:
         Ref: Subnets
-      SecurityGroups: 
-      - !Ref ALBSecurityGroup
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
   ALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
-      - Type: forward
-        TargetGroupArn:
-          Ref: ALBTargetGroup
+        - Type: forward
+          TargetGroupArn:
+            Ref: ALBTargetGroup
       LoadBalancerArn:
         Ref: ApplicationLoadBalancer
       Port: '80'
       Protocol: HTTP
   ALBTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
     Properties:
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
@@ -132,40 +128,39 @@ Resources:
       UnhealthyThresholdCount: 5
       VpcId:
         Ref: VpcId
-
   ALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+    Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: HTTP access
       SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: '80'
-        ToPort: '80'
-        CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
       VpcId:
         Ref: VpcId
   InstanceSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+    Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: Enable SSH access and HTTP from the load balancer only
       SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: '22'
-        ToPort: '22'
-        CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: '80'
-        ToPort: '80'
-        SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
       VpcId:
         Ref: VpcId
 Outputs:
   URL:
     Description: The URL of the website
     Value:
-      Fn::Join:
-      - ''
-      - - http://
-        - Fn::GetAtt:
-          - ApplicationLoadBalancer
-          - DNSName
+      'Fn::Join':
+        - ''
+        - - 'http://'
+          - 'Fn::GetAtt':
+              - ApplicationLoadBalancer
+              - DNSName
